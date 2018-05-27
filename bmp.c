@@ -56,17 +56,17 @@ bmp_image_t *bmp_from_path(const char *path) {
 
     const size_t extra_size = image->header.imageDataOffset - sizeof(struct bmp_header) - sizeof(struct bmp_info);
 
-    if (extra_size != 54) {
+    if (extra_size != 0) {
         // Si la imagen contiene datos extra, vamos a asegurarnos de que queden en la imagen destino, pero
         // no garantizamos que el programa funcione correctamente.
         printf("Image contains extra data between header and bitmap!");
+        image->extra = malloc(extra_size);
+
+        fread(image->extra, extra_size, 1, fp);
+    } else {
+        image->extra = NULL;
     }
 
-    image->extra = malloc(extra_size);
-
-//    fseek(fp, image->header.imageDataOffset, SEEK_SET);
-
-    fread(image->extra, extra_size, 1, fp);
     fread(image->data, image->info.imageSize, 1, fp);
 
     return image;
@@ -87,7 +87,9 @@ int bmp_save(const bmp_image_t *image, const char *path) {
 
     const size_t extra_size = image->header.imageDataOffset - sizeof(struct bmp_header) - sizeof(struct bmp_info);
 
-    fwrite(image->extra, extra_size, 1, fp);
+    if (extra_size > 0) {
+        fwrite(image->extra, extra_size, 1, fp);
+    }
 
     fwrite(image->data, image->info.imageSize, 1, fp);
 
