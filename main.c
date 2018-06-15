@@ -4,7 +4,7 @@
 #include <getopt.h>
 
 #include "bmp.h"
-
+#include "stegobmp.h"
 
 struct {
     unsigned int embed;
@@ -100,9 +100,46 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    bmp_image_t *image = bmp_from_path("/home/sebikul/Proyectos/stegobmp/sample/barbara.bmp");
+    STEG_METHOD steg_method = STEG_NONE;
+    ENC_METHOD enc_method = ENC_METHOD_NONE;
+    ENC_MODE enc_mode = ENC_MODE_NONE;
 
-    bmp_save(image, "/home/sebikul/Proyectos/stegobmp/sample/barbara.save.bmp");
+    if (arg_opts.steg_method) {
+        steg_method = stegobmp_steg_method(arg_opts.steg_method);
+        if (steg_method == STEG_ERROR) {
+            printf("Invalid steg method: %s", arg_opts.steg_method);
+            return 1;
+        }
+    }
+
+    if (arg_opts.enc_method) {
+        enc_method = stegobmp_enc_method(arg_opts.enc_method);
+        if (enc_method == ENC_METHOD_ERROR) {
+            printf("Invalid enc method: %s", arg_opts.enc_method);
+            return 1;
+        }
+    }
+
+    if (arg_opts.enc_mode) {
+        enc_mode = stegobmp_enc_mode(arg_opts.enc_mode);
+        if (enc_mode == ENC_MODE_ERROR) {
+            printf("Invalid enc mode: %s", arg_opts.enc_mode);
+            return 1;
+        }
+    }
+
+    bmp_image_t *image = bmp_from_path(arg_opts.carrier_path);
+
+    if(image==NULL){
+        return 2;
+    }
+
+    if (arg_opts.embed) {
+        stegobmp_embed(image, arg_opts.in_path, steg_method, enc_method, enc_mode, arg_opts.password);
+    }
+
+
+    bmp_save(image, arg_opts.out_path);
 
     return 0;
 }
