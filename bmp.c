@@ -24,7 +24,7 @@ struct __attribute__ ((packed)) bmp_info {
     uint16_t colorPlanes;
     uint16_t bitsPerPixel;
     uint32_t compressionMethod;
-    uint32_t imageSize; /*Size of raw bitmap data*/
+    uint32_t imageSize;
     int32_t horizontalRes;
     int32_t verticalRes;
     uint32_t colorsInPalette;
@@ -106,6 +106,12 @@ int bmp_save(const bmp_image_t *image, const char *path) {
     fclose(fp);
 
     return 1;
+}
+
+void bmp_free(bmp_image_t *image) {
+
+    free(image->data);
+    free(image);
 }
 
 uint8_t *bmp_get_data_buffer(bmp_image_t *image) {

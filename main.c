@@ -100,6 +100,12 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    if (arg_opts.embed) {
+        printf("[+] Embeding %s into %s\n", arg_opts.in_path, arg_opts.carrier_path);
+    } else {
+        printf("[+] Extracting %s from %s\n", arg_opts.out_path, arg_opts.carrier_path);
+    }
+
     STEG_METHOD steg_method = STEG_NONE;
     ENC_METHOD enc_method = ENC_METHOD_NONE;
     ENC_MODE enc_mode = ENC_MODE_NONE;
@@ -107,39 +113,57 @@ int main(int argc, char *argv[]) {
     if (arg_opts.steg_method) {
         steg_method = stegobmp_steg_method(arg_opts.steg_method);
         if (steg_method == STEG_ERROR) {
-            printf("Invalid steg method: %s", arg_opts.steg_method);
+            printf("Invalid steg method: %s\n", arg_opts.steg_method);
             return 1;
         }
+        printf("\t\tSteg Method: %s\n", arg_opts.steg_method);
     }
 
     if (arg_opts.enc_method) {
         enc_method = stegobmp_enc_method(arg_opts.enc_method);
         if (enc_method == ENC_METHOD_ERROR) {
-            printf("Invalid enc method: %s", arg_opts.enc_method);
+            printf("Invalid enc method: %s\n", arg_opts.enc_method);
             return 1;
         }
+    }
+
+    if (enc_method == ENC_METHOD_NONE) {
+        printf("\t\tEncryption Method: None\n");
+    } else {
+        printf("\t\tEncryption Method: %s\n", arg_opts.enc_method);
     }
 
     if (arg_opts.enc_mode) {
         enc_mode = stegobmp_enc_mode(arg_opts.enc_mode);
         if (enc_mode == ENC_MODE_ERROR) {
-            printf("Invalid enc mode: %s", arg_opts.enc_mode);
+            printf("Invalid enc mode: %s\n", arg_opts.enc_mode);
             return 1;
         }
     }
 
+    if (enc_mode == ENC_MODE_NONE) {
+        printf("\t\tEncryption Mode: None\n");
+    } else {
+        printf("\t\tEncryption Mode: %s\n", arg_opts.enc_mode);
+    }
+
     bmp_image_t *image = bmp_from_path(arg_opts.carrier_path);
 
-    if(image==NULL){
+    if (image == NULL) {
         return 2;
     }
 
     if (arg_opts.embed) {
         stegobmp_embed(image, arg_opts.in_path, steg_method, enc_method, enc_mode, arg_opts.password);
+        bmp_save(image, arg_opts.out_path);
     }
 
+    if (arg_opts.extract) {
+        stegobmp_extract(image, arg_opts.out_path, steg_method, enc_method, enc_mode, arg_opts.password);
+    }
 
-    bmp_save(image, arg_opts.out_path);
+    bmp_free(image);
+
 
     return 0;
 }
