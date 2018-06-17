@@ -191,6 +191,7 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
     switch (steg_method) {
         case LSB1:
             lsb1_extract(&hidden_data_size, image_buffer, sizeof(hidden_data_size), 0);
+            hidden_data_size = __bswap_32(hidden_data_size);
             break;
         case LSB4:
             break;
