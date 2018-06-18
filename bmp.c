@@ -118,6 +118,10 @@ uint8_t *bmp_get_data_buffer(bmp_image_t *image) {
     return image->data;
 }
 
+uint32_t bmp_get_image_size(bmp_image_t *image) {
+    return image->info.imageSize;
+}
+
 int bmp_check_size(bmp_image_t *image, long size) {
     return image->info.imageSize > size * 8;
 }
