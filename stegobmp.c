@@ -99,7 +99,7 @@ static int lsb1_extract(uint8_t *dst, const uint8_t *src, long nbytes, int null_
 
 static void lsb4_hide(uint8_t *dst, const uint8_t *src, long nbytes) {
 
-    static uint8_t mask = (uint8_t) (~0x1);
+    static uint8_t mask = (uint8_t) (~0xF);
 
     for (int i = 0, d = 0; i < nbytes; ++i) {
 
@@ -219,12 +219,41 @@ int stegobmp_embed(bmp_image_t *image, const char *input_path, STEG_METHOD steg_
             lsb1_hide(image_buffer, data_to_save, size_of_data);
             break;
         case LSB4:
+            lsb4_hide(image_buffer, data_to_save, size_of_data);
             break;
         case LSBE:
             break;
     }
 
     return 0;
+}
+
+static void stegobmp_extract_size(STEG_METHOD steg_method, uint32_t *hidden_data_size, uint8_t *image_buffer) {
+    switch (steg_method) {
+        case LSB1:
+            lsb1_extract(hidden_data_size, image_buffer, sizeof(*hidden_data_size), 0);
+            break;
+        case LSB4:
+            lsb4_extract(hidden_data_size, image_buffer, sizeof(*hidden_data_size), 0);
+            break;
+        case LSBE:
+            break;
+    }
+    *hidden_data_size = __bswap_32(*hidden_data_size);
+}
+
+static void
+stegobmp_extract_data(STEG_METHOD steg_method, void *raw_data, uint8_t *image_buffer, uint32_t hidden_data_size) {
+    switch (steg_method) {
+        case LSB1:
+            lsb1_extract(raw_data, image_buffer + sizeof(uint32_t) * 8, hidden_data_size, 0);
+            break;
+        case LSB4:
+            lsb4_extract(raw_data, image_buffer + sizeof(uint32_t) * 2, hidden_data_size, 0);
+            break;
+        case LSBE:
+            break;
+    }
 }
 
 int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD steg_method, ENC_METHOD enc_method,
@@ -234,37 +263,17 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
     uint32_t hidden_data_size = 0;
     char *extension;
 
-
-    switch (steg_method) {
-        case LSB1:
-            lsb1_extract(&hidden_data_size, image_buffer, sizeof(hidden_data_size), 0);
-            break;
-        case LSB4:
-            lsb4_extract(&hidden_data_size, image_buffer, sizeof(hidden_data_size), 0);
-            break;
-        case LSBE:
-            break;
-    }
-    hidden_data_size = __bswap_32(hidden_data_size);
+    stegobmp_extract_size(steg_method, &hidden_data_size, image_buffer);
 
     if (hidden_data_size < bmp_get_image_size(image) / 8) {
-        printf("Embeded file possibly found.\n");
+        printf("[!] Embeded file possibly found.\n");
     } else {
         return 1;
     }
 
     void *raw_data = calloc(hidden_data_size, 1);
 
-    switch (steg_method) {
-        case LSB1:
-            lsb1_extract(raw_data, image_buffer + sizeof(hidden_data_size) * 8, hidden_data_size, 0);
-            break;
-        case LSB4:
-            lsb4_extract(raw_data, image_buffer + sizeof(hidden_data_size) * 2, hidden_data_size, 0);
-            break;
-        case LSBE:
-            break;
-    }
+    stegobmp_extract_data(steg_method, raw_data, image_buffer, hidden_data_size);
 
 
     if (enc_method != ENC_METHOD_NONE) {
@@ -274,7 +283,7 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
     } else {
         extension = calloc(30, 1);
         uint8_t *offset;
-        int ext_size;
+        int ext_size = 0;
 
         switch (steg_method) {
             case LSB1:
@@ -299,7 +308,7 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
     strcpy(filename, output_path);
     strcat(filename, extension);
 
-    printf("Saving to: %s", filename);
+    printf("[+] Saving to: %s", filename);
     FILE *fp = fopen(filename, "wb+");
 
     if (fp == NULL) {
