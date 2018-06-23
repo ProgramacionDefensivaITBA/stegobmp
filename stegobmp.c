@@ -10,6 +10,7 @@
 #include <ctype.h>
 #include "bmp.h"
 #include "stegobmp.h"
+#include "crypt.h"
 
 
 STEG_METHOD stegobmp_steg_method(const char *steg_method) {
@@ -59,7 +60,7 @@ static void lsb1_hide(uint8_t *dst, const uint8_t *src, long nbytes) {
     for (int i = 0, d = 0; i < nbytes; ++i) {
 
         for (int j = 7; j >= 0; --j) {
-            uint8_t new_bit = src[i] & (0x1 << j);
+            uint8_t new_bit = (uint8_t) (src[i] & (0x1 << j));
 
             new_bit = new_bit >> j;
 
@@ -78,7 +79,7 @@ static int lsb1_extract(uint8_t *dst, const uint8_t *src, long nbytes, int null_
     while (curr_dst < nbytes) {
 
         for (int j = 0; j < 8; ++j) {
-            uint8_t new_bit = src[curr_src + j] & 0x1;
+            uint8_t new_bit = (uint8_t) (src[curr_src + j] & 0x1);
 
             new_bit = new_bit << (7 - j);
 
@@ -104,7 +105,7 @@ static void lsb4_hide(uint8_t *dst, const uint8_t *src, long nbytes) {
     for (int i = 0, d = 0; i < nbytes; ++i) {
 
         for (int j = 1; j >= 0; --j) {
-            uint8_t new_bit = src[i] & (0xF << (j * 4));
+            uint8_t new_bit = (uint8_t) (src[i] & (0xF << (j * 4)));
 
             new_bit = new_bit >> (j * 4);
 
@@ -123,7 +124,7 @@ static int lsb4_extract(uint8_t *dst, const uint8_t *src, long nbytes, int null_
     while (curr_dst < nbytes) {
 
         for (int j = 0; j < 2; ++j) {
-            uint8_t new_bit = src[curr_src + j] & 0xF;
+            uint8_t new_bit = (uint8_t) (src[curr_src + j] & 0xF);
 
             new_bit = new_bit << (4 - j * 4);
 
@@ -191,20 +192,42 @@ int stegobmp_embed(bmp_image_t *image, const char *input_path, STEG_METHOD steg_
     char *ext = file_ext(input_path);
 
     if (enc_method != ENC_METHOD_NONE) {
+        crypt_init();
 
-        // TODO
+        long size_of_plaintext_data = sizeof(uint32_t) + input_file_size + strlen(ext) + 1;
+        uint8_t *plaintext = malloc((size_t) size_of_plaintext_data);
+
+        uint32_t swapped_size = __bswap_32((unsigned) input_file_size);
+
+        memcpy(plaintext, &swapped_size, sizeof(uint32_t));
+        memcpy(plaintext + sizeof(uint32_t), file_buffer, (size_t) input_file_size);
+        memcpy(plaintext + sizeof(uint32_t) + input_file_size, ext, strlen(ext) + 1);
+
+        int ciphertext_len;
+
+        unsigned char *ciphertext = crypt_enc(enc_method, enc_mode, plaintext, size_of_plaintext_data, password,
+                                              &ciphertext_len);
+
+        if (ciphertext == NULL) {
+            free(plaintext);
+            return 3;
+        }
+
+        data_to_save = ciphertext;
+        size_of_data = ciphertext_len;
+
 
     } else {
 
         size_of_data = sizeof(uint32_t) + input_file_size + strlen(ext) + 1;
 
-        data_to_save = malloc(size_of_data);
+        data_to_save = malloc((size_t) size_of_data);
 //        *(uint32_t *) data_to_save = (uint32_t) input_file_size;
 
-        uint32_t swapped_size = __bswap_32(input_file_size);
+        uint32_t swapped_size = __bswap_32((unsigned) input_file_size);
 
         memcpy(data_to_save, &swapped_size, sizeof(uint32_t));
-        memcpy(data_to_save + sizeof(uint32_t), file_buffer, input_file_size);
+        memcpy(data_to_save + sizeof(uint32_t), file_buffer, (size_t) input_file_size);
 
         memcpy(data_to_save + sizeof(uint32_t) + input_file_size, ext, strlen(ext) + 1);
 
@@ -213,6 +236,8 @@ int stegobmp_embed(bmp_image_t *image, const char *input_path, STEG_METHOD steg_
 //        data_to_save = file_buffer;
 //        size_of_data = input_file_size;
     }
+
+    free(file_buffer);
 
     switch (steg_method) {
         case LSB1:
@@ -225,16 +250,18 @@ int stegobmp_embed(bmp_image_t *image, const char *input_path, STEG_METHOD steg_
             break;
     }
 
+    free(data_to_save);
+
     return 0;
 }
 
 static void stegobmp_extract_size(STEG_METHOD steg_method, uint32_t *hidden_data_size, uint8_t *image_buffer) {
     switch (steg_method) {
         case LSB1:
-            lsb1_extract(hidden_data_size, image_buffer, sizeof(*hidden_data_size), 0);
+            lsb1_extract((uint8_t *) hidden_data_size, image_buffer, sizeof(*hidden_data_size), 0);
             break;
         case LSB4:
-            lsb4_extract(hidden_data_size, image_buffer, sizeof(*hidden_data_size), 0);
+            lsb4_extract((uint8_t *) hidden_data_size, image_buffer, sizeof(*hidden_data_size), 0);
             break;
         case LSBE:
             break;
@@ -288,11 +315,11 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
         switch (steg_method) {
             case LSB1:
                 offset = image_buffer + sizeof(hidden_data_size) * 8 + hidden_data_size * 8;
-                ext_size = lsb1_extract(extension, offset, hidden_data_size, 1);
+                ext_size = lsb1_extract((uint8_t *) extension, offset, hidden_data_size, 1);
                 break;
             case LSB4:
                 offset = image_buffer + sizeof(hidden_data_size) * 2 + hidden_data_size * 2;
-                ext_size = lsb4_extract(extension, offset, hidden_data_size, 1);
+                ext_size = lsb4_extract((uint8_t *) extension, offset, hidden_data_size, 1);
                 break;
             case LSBE:
                 break;
