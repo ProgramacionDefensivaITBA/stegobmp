@@ -5,17 +5,8 @@
 #ifndef STEGOBMP_STREGOBMP_H
 #define STEGOBMP_STREGOBMP_H
 
-typedef enum {
-    STEG_ERROR, LSB1, LSB4, LSBE, STEG_NONE
-} STEG_METHOD;
 
-typedef enum {
-    ENC_METHOD_ERROR, AES128, AES192, AES256, DES, ENC_METHOD_NONE
-} ENC_METHOD;
-
-typedef enum {
-    ENC_MODE_ERROR, ECB, CFB, OFB, CBC, ENC_MODE_NONE
-} ENC_MODE;
+#include "crypt.h"
 
 STEG_METHOD stegobmp_steg_method(const char *steg_method);
 

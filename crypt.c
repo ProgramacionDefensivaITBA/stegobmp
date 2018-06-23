@@ -8,7 +8,6 @@
 #include <string.h>
 #include <stdint.h>
 #include "crypt.h"
-#include "stegobmp.h"
 
 static void handle_errors(void) {
     ERR_print_errors_fp(stderr);
@@ -28,7 +27,7 @@ void crypt_free(void) {
 
 
 static void crypt_derive_key(const EVP_CIPHER *cipher, const char *password, unsigned char *key, unsigned char *iv) {
-    if (EVP_BytesToKey(cipher, EVP_md5(), NULL, (unsigned char *) password, (int) strlen(password), 1, key, iv) == 0) {
+    if (EVP_BytesToKey(cipher, EVP_sha256(), NULL, (unsigned char *) password, (int) strlen(password), 1, key, iv) == 0) {
         handle_errors();
     }
 }
@@ -126,7 +125,6 @@ crypt_enc(ENC_METHOD enc_method, ENC_MODE enc_mode, uint8_t *plaintext, long pla
 
 
     unsigned char *ciphertext = malloc((size_t) (plaintext_len + EVP_CIPHER_block_size(evp_cipher) - 1));
-//    int ciphertext_length = 0;
 
     if (1 != EVP_EncryptUpdate(ctx, ciphertext, ciphertext_length, plaintext, (int) plaintext_len)) {
         handle_errors();
@@ -138,10 +136,58 @@ crypt_enc(ENC_METHOD enc_method, ENC_MODE enc_mode, uint8_t *plaintext, long pla
     }
     *ciphertext_length += temp_len;
 
-    /* Clean up */
     EVP_CIPHER_CTX_free(ctx);
 
-    realloc(ciphertext, (size_t) ciphertext_length);
+    ciphertext = realloc(ciphertext, (size_t) ciphertext_length);
 
     return ciphertext;
+}
+
+
+unsigned char *
+crypt_dec(ENC_METHOD enc_method, ENC_MODE enc_mode, uint8_t *ciphertext, long ciphertext_len, const char *password,
+          int *plaintext_length) {
+
+    unsigned char *key;
+    unsigned char iv[16];
+
+    const EVP_CIPHER *evp_cipher = crypt_get_evp_cypher(enc_method, enc_mode);
+
+    if (evp_cipher == NULL) {
+        return NULL;
+    }
+
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) {
+        handle_errors();
+    }
+
+    key = malloc((size_t) EVP_CIPHER_key_length(evp_cipher));
+
+    crypt_derive_key(evp_cipher, password, key, iv);
+
+    if (1 != EVP_DecryptInit_ex(ctx, evp_cipher, NULL, key, iv)) {
+        free(key);
+        handle_errors();
+    }
+    free(key);
+
+
+    unsigned char *plaintext = malloc((size_t) (ciphertext_len + EVP_CIPHER_block_size(evp_cipher)));
+
+    if (1 != EVP_DecryptUpdate(ctx, plaintext, plaintext_length, ciphertext, (int) ciphertext_len)) {
+        handle_errors();
+    }
+    int temp_len;
+
+    if (1 != EVP_DecryptFinal_ex(ctx, plaintext + *plaintext_length, &temp_len)) {
+        handle_errors();
+    }
+    *plaintext_length += temp_len;
+
+    EVP_CIPHER_CTX_free(ctx);
+
+    plaintext = realloc(plaintext, (size_t) *plaintext_length);
+
+    return plaintext;
 }

@@ -208,6 +208,8 @@ int stegobmp_embed(bmp_image_t *image, const char *input_path, STEG_METHOD steg_
         unsigned char *ciphertext = crypt_enc(enc_method, enc_mode, plaintext, size_of_plaintext_data, password,
                                               &ciphertext_len);
 
+        crypt_free();
+
         if (ciphertext == NULL) {
             free(plaintext);
             return 3;
@@ -305,7 +307,23 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
 
     if (enc_method != ENC_METHOD_NONE) {
 
-        // TODO
+        int plaintext_len;
+
+        crypt_init();
+
+        unsigned char *plaintext = crypt_dec(enc_method, enc_mode, raw_data, hidden_data_size, password,
+                                             &plaintext_len);
+
+        crypt_free();
+        free(raw_data);
+        memccpy(&hidden_data_size, plaintext, sizeof(uint32_t), 1);
+        raw_data = plaintext + sizeof(uint32_t);
+
+        extension = (char *) raw_data + hidden_data_size;
+        size_t ext_size = strlen(extension);
+
+        extension[ext_size] = 0;
+
 
     } else {
         extension = calloc(30, 1);
@@ -326,7 +344,7 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
         }
 
 
-        realloc(extension, ext_size + 1);
+        extension = realloc(extension, ext_size + 1);
 
         extension[ext_size] = 0;
     }
