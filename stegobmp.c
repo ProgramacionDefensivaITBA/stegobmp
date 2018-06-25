@@ -143,6 +143,29 @@ static int lsb4_extract(uint8_t *dst, const uint8_t *src, long nbytes, int null_
     return curr_dst;
 }
 
+static void lsbe_hide(uint8_t *dst, const uint8_t *src, long nbytes) {
+
+    static uint8_t mask = (uint8_t) (~0x1);
+
+    for (int i = 0, d = 0; i < nbytes; ++i) {
+
+        for (int j = 7; j >= 0; --j) {
+
+            while (dst[d] < 0xFE) {
+                d++;
+            }
+
+            uint8_t new_bit = (uint8_t) (src[i] & (0x1 << j));
+
+            new_bit = new_bit >> j;
+
+
+            dst[d] = (dst[d] & mask) | new_bit;
+            d++;
+        }
+    }
+}
+
 static int lsbe_extract(uint8_t *dst, const uint8_t *src, long nbytes, int null_cutoff, uint32_t *offset) {
 
     uint32_t curr_src = 0;
@@ -289,6 +312,7 @@ int stegobmp_embed(bmp_image_t *image, const char *input_path, STEG_METHOD steg_
             lsb4_hide(image_buffer, data_to_save, size_of_data);
             break;
         case LSBE:
+            lsbe_hide(image_buffer, data_to_save, size_of_data);
             break;
     }
 
