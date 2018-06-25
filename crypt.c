@@ -27,7 +27,8 @@ void crypt_free(void) {
 
 
 static void crypt_derive_key(const EVP_CIPHER *cipher, const char *password, unsigned char *key, unsigned char *iv) {
-    if (EVP_BytesToKey(cipher, EVP_sha256(), NULL, (unsigned char *) password, (int) strlen(password), 1, key, iv) == 0) {
+    if (EVP_BytesToKey(cipher, EVP_sha256(), NULL, (unsigned char *) password, (int) strlen(password), 1, key, iv) ==
+        0) {
         handle_errors();
     }
 }
@@ -112,6 +113,7 @@ crypt_enc(ENC_METHOD enc_method, ENC_MODE enc_mode, uint8_t *plaintext, long pla
     if (!ctx) {
         handle_errors();
     }
+    EVP_CIPHER_CTX_set_padding(ctx, 1);
 
     key = malloc((size_t) EVP_CIPHER_key_length(evp_cipher));
 
@@ -123,22 +125,23 @@ crypt_enc(ENC_METHOD enc_method, ENC_MODE enc_mode, uint8_t *plaintext, long pla
     }
     free(key);
 
-
-    unsigned char *ciphertext = malloc((size_t) (plaintext_len + EVP_CIPHER_block_size(evp_cipher) - 1));
+    size_t ciph_size = (size_t) (plaintext_len + EVP_CIPHER_CTX_block_size(ctx) - 1);
+    printf("Allocating %d for ciphertext.\n", (int) ciph_size);
+    unsigned char *ciphertext = malloc(ciph_size);
 
     if (1 != EVP_EncryptUpdate(ctx, ciphertext, ciphertext_length, plaintext, (int) plaintext_len)) {
         handle_errors();
     }
     int temp_len;
 
-    if (1 != EVP_EncryptFinal_ex(ctx, ciphertext + *ciphertext_length, &temp_len)) {
+    if (1 != EVP_EncryptFinal(ctx, ciphertext + *ciphertext_length, &temp_len)) {
         handle_errors();
     }
     *ciphertext_length += temp_len;
 
     EVP_CIPHER_CTX_free(ctx);
 
-    ciphertext = realloc(ciphertext, (size_t) ciphertext_length);
+    ciphertext = realloc(ciphertext, (size_t) *ciphertext_length);
 
     return ciphertext;
 }
@@ -174,16 +177,17 @@ crypt_dec(ENC_METHOD enc_method, ENC_MODE enc_mode, uint8_t *ciphertext, long ci
 
 
     unsigned char *plaintext = malloc((size_t) (ciphertext_len + EVP_CIPHER_block_size(evp_cipher)));
+    int plain_len;
 
-    if (1 != EVP_DecryptUpdate(ctx, plaintext, plaintext_length, ciphertext, (int) ciphertext_len)) {
+    if (1 != EVP_DecryptUpdate(ctx, plaintext, &plain_len, ciphertext, (int) ciphertext_len)) {
         handle_errors();
     }
     int temp_len;
 
-    if (1 != EVP_DecryptFinal_ex(ctx, plaintext + *plaintext_length, &temp_len)) {
+    if (1 != EVP_DecryptFinal_ex(ctx, plaintext + plain_len, &temp_len)) {
         handle_errors();
     }
-    *plaintext_length += temp_len;
+    *plaintext_length = plain_len + temp_len;
 
     EVP_CIPHER_CTX_free(ctx);
 

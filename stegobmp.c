@@ -197,6 +197,7 @@ int stegobmp_embed(bmp_image_t *image, const char *input_path, STEG_METHOD steg_
         long size_of_plaintext_data = sizeof(uint32_t) + input_file_size + strlen(ext) + 1;
         uint8_t *plaintext = malloc((size_t) size_of_plaintext_data);
 
+
         uint32_t swapped_size = __bswap_32((unsigned) input_file_size);
 
         memcpy(plaintext, &swapped_size, sizeof(uint32_t));
@@ -214,9 +215,14 @@ int stegobmp_embed(bmp_image_t *image, const char *input_path, STEG_METHOD steg_
             free(plaintext);
             return 3;
         }
+        uint32_t swapped_full_size = __bswap_32((unsigned) ciphertext_len);
 
-        data_to_save = ciphertext;
-        size_of_data = ciphertext_len;
+        uint8_t *data_to_steg = malloc(ciphertext_len + sizeof(uint32_t));
+        memcpy(data_to_steg, &swapped_full_size, sizeof(uint32_t));
+        memcpy(data_to_steg + sizeof(uint32_t), ciphertext, (size_t) ciphertext_len);
+
+        data_to_save = data_to_steg;
+        size_of_data = ciphertext_len + sizeof(uint32_t);
 
 
     } else {
@@ -316,7 +322,8 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
 
         crypt_free();
         free(raw_data);
-        memccpy(&hidden_data_size, plaintext, sizeof(uint32_t), 1);
+        memcpy(&hidden_data_size, plaintext, sizeof(uint32_t));
+        hidden_data_size = __bswap_32(hidden_data_size);
         raw_data = plaintext + sizeof(uint32_t);
 
         extension = (char *) raw_data + hidden_data_size;
