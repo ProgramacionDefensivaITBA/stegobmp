@@ -17,7 +17,7 @@ static void handle_errors(void) {
 void crypt_init(void) {
     ERR_load_crypto_strings();
     OpenSSL_add_all_algorithms();
-    OPENSSL_config(NULL);
+//    OPENSSL_config(NULL);
 }
 
 void crypt_free(void) {

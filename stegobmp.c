@@ -71,10 +71,10 @@ static void lsb1_hide(uint8_t *dst, const uint8_t *src, long nbytes) {
     }
 }
 
-static int lsb1_extract(uint8_t *dst, const uint8_t *src, long nbytes, int null_cutoff) {
+static size_t lsb1_extract(uint8_t *dst, const uint8_t *src, long nbytes, int null_cutoff) {
 
-    int curr_src = 0;
-    int curr_dst = 0;
+    size_t curr_src = 0;
+    size_t curr_dst = 0;
 
     while (curr_dst < nbytes) {
 
@@ -116,10 +116,10 @@ static void lsb4_hide(uint8_t *dst, const uint8_t *src, long nbytes) {
     }
 }
 
-static int lsb4_extract(uint8_t *dst, const uint8_t *src, long nbytes, int null_cutoff) {
+static size_t lsb4_extract(uint8_t *dst, const uint8_t *src, long nbytes, int null_cutoff) {
 
-    int curr_src = 0;
-    int curr_dst = 0;
+    size_t curr_src = 0;
+    size_t curr_dst = 0;
 
     while (curr_dst < nbytes) {
 
@@ -166,7 +166,7 @@ static void lsbe_hide(uint8_t *dst, const uint8_t *src, long nbytes) {
     }
 }
 
-static int lsbe_extract(uint8_t *dst, const uint8_t *src, long nbytes, int null_cutoff, uint32_t *offset) {
+static size_t lsbe_extract(uint8_t *dst, const uint8_t *src, long nbytes, int null_cutoff, uint32_t *offset) {
 
     uint32_t curr_src = 0;
     uint32_t curr_dst = 0;
@@ -314,6 +314,8 @@ int stegobmp_embed(bmp_image_t *image, const char *input_path, STEG_METHOD steg_
         case LSBE:
             lsbe_hide(image_buffer, data_to_save, size_of_data);
             break;
+        default:
+            abort();
     }
 
     free(data_to_save);
@@ -333,6 +335,8 @@ stegobmp_extract_size(STEG_METHOD steg_method, uint32_t *hidden_data_size, uint8
         case LSBE:
             lsbe_extract((uint8_t *) hidden_data_size, image_buffer, sizeof(*hidden_data_size), 0, offset);
             break;
+        default:
+            abort();
     }
     *hidden_data_size = __bswap_32(*hidden_data_size);
 }
@@ -350,6 +354,8 @@ stegobmp_extract_data(STEG_METHOD steg_method, void *raw_data, uint8_t *image_bu
         case LSBE:
             lsbe_extract(raw_data, image_buffer, hidden_data_size, 0, offset);
             break;
+        default:
+            abort();
     }
 }
 
@@ -399,7 +405,7 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
     } else {
         extension = calloc(30, 1);
         uint8_t *tmp_offset;
-        int ext_size = 0;
+        size_t ext_size = 0;
 
         switch (steg_method) {
             case LSB1:
@@ -413,6 +419,8 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
             case LSBE:
                 ext_size = lsbe_extract((uint8_t *) extension, image_buffer, 30, 1, &offset);
                 break;
+            default:
+                abort();
         }
 
 
