@@ -143,6 +143,40 @@ static int lsb4_extract(uint8_t *dst, const uint8_t *src, long nbytes, int null_
     return curr_dst;
 }
 
+static int lsbe_extract(uint8_t *dst, const uint8_t *src, long nbytes, int null_cutoff, uint32_t *offset) {
+
+    uint32_t curr_src = 0;
+    uint32_t curr_dst = 0;
+
+    while (curr_dst < nbytes) {
+
+        for (int j = 0; j < 8; ++j) {
+
+            while (src[*offset + curr_src + j] < 0xFE) {
+                curr_src++;
+            }
+
+            uint8_t new_bit = (uint8_t) (src[*offset + curr_src + j] & 0x1);
+
+            new_bit = new_bit << (7 - j);
+
+            dst[curr_dst] = dst[curr_dst] | new_bit;
+        }
+
+        if (null_cutoff && dst[curr_dst] == 0) {
+            return curr_dst;
+        }
+
+        curr_src += 8;
+        curr_dst++;
+
+    }
+
+    *offset += curr_src;
+
+    return curr_dst;
+}
+
 //https://www.rosettacode.org/wiki/Extract_file_extension#C
 static char *file_ext(const char *string) {
     char *ext = strrchr(string, '.');
@@ -263,7 +297,8 @@ int stegobmp_embed(bmp_image_t *image, const char *input_path, STEG_METHOD steg_
     return 0;
 }
 
-static void stegobmp_extract_size(STEG_METHOD steg_method, uint32_t *hidden_data_size, uint8_t *image_buffer) {
+static void
+stegobmp_extract_size(STEG_METHOD steg_method, uint32_t *hidden_data_size, uint8_t *image_buffer, uint32_t *offset) {
     switch (steg_method) {
         case LSB1:
             lsb1_extract((uint8_t *) hidden_data_size, image_buffer, sizeof(*hidden_data_size), 0);
@@ -272,13 +307,15 @@ static void stegobmp_extract_size(STEG_METHOD steg_method, uint32_t *hidden_data
             lsb4_extract((uint8_t *) hidden_data_size, image_buffer, sizeof(*hidden_data_size), 0);
             break;
         case LSBE:
+            lsbe_extract((uint8_t *) hidden_data_size, image_buffer, sizeof(*hidden_data_size), 0, offset);
             break;
     }
     *hidden_data_size = __bswap_32(*hidden_data_size);
 }
 
 static void
-stegobmp_extract_data(STEG_METHOD steg_method, void *raw_data, uint8_t *image_buffer, uint32_t hidden_data_size) {
+stegobmp_extract_data(STEG_METHOD steg_method, void *raw_data, uint8_t *image_buffer, uint32_t hidden_data_size,
+                      uint32_t *offset) {
     switch (steg_method) {
         case LSB1:
             lsb1_extract(raw_data, image_buffer + sizeof(uint32_t) * 8, hidden_data_size, 0);
@@ -287,6 +324,7 @@ stegobmp_extract_data(STEG_METHOD steg_method, void *raw_data, uint8_t *image_bu
             lsb4_extract(raw_data, image_buffer + sizeof(uint32_t) * 2, hidden_data_size, 0);
             break;
         case LSBE:
+            lsbe_extract(raw_data, image_buffer, hidden_data_size, 0, offset);
             break;
     }
 }
@@ -298,7 +336,9 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
     uint32_t hidden_data_size = 0;
     char *extension;
 
-    stegobmp_extract_size(steg_method, &hidden_data_size, image_buffer);
+    uint32_t offset = 0;
+
+    stegobmp_extract_size(steg_method, &hidden_data_size, image_buffer, &offset);
 
     if (hidden_data_size < bmp_get_image_size(image) / 8) {
         printf("[!] Embeded file possibly found.\n");
@@ -308,7 +348,7 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
 
     void *raw_data = calloc(hidden_data_size, 1);
 
-    stegobmp_extract_data(steg_method, raw_data, image_buffer, hidden_data_size);
+    stegobmp_extract_data(steg_method, raw_data, image_buffer, hidden_data_size, &offset);
 
 
     if (enc_method != ENC_METHOD_NONE) {
@@ -334,19 +374,20 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
 
     } else {
         extension = calloc(30, 1);
-        uint8_t *offset;
+        uint8_t *tmp_offset;
         int ext_size = 0;
 
         switch (steg_method) {
             case LSB1:
-                offset = image_buffer + sizeof(hidden_data_size) * 8 + hidden_data_size * 8;
-                ext_size = lsb1_extract((uint8_t *) extension, offset, hidden_data_size, 1);
+                tmp_offset = image_buffer + sizeof(hidden_data_size) * 8 + hidden_data_size * 8;
+                ext_size = lsb1_extract((uint8_t *) extension, tmp_offset, hidden_data_size, 1);
                 break;
             case LSB4:
-                offset = image_buffer + sizeof(hidden_data_size) * 2 + hidden_data_size * 2;
-                ext_size = lsb4_extract((uint8_t *) extension, offset, hidden_data_size, 1);
+                tmp_offset = image_buffer + sizeof(hidden_data_size) * 2 + hidden_data_size * 2;
+                ext_size = lsb4_extract((uint8_t *) extension, tmp_offset, hidden_data_size, 1);
                 break;
             case LSBE:
+                ext_size = lsbe_extract((uint8_t *) extension, image_buffer, 30, 1, &offset);
                 break;
         }
 
