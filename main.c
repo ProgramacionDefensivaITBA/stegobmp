@@ -153,17 +153,19 @@ int main(int argc, char *argv[]) {
         return 2;
     }
 
+    int retval;
+
     if (arg_opts.embed) {
-        stegobmp_embed(image, arg_opts.in_path, steg_method, enc_method, enc_mode, arg_opts.password);
+        retval = stegobmp_embed(image, arg_opts.in_path, steg_method, enc_method, enc_mode, arg_opts.password);
         bmp_save(image, arg_opts.out_path);
     }
 
     if (arg_opts.extract) {
-        stegobmp_extract(image, arg_opts.out_path, steg_method, enc_method, enc_mode, arg_opts.password);
+        retval = stegobmp_extract(image, arg_opts.out_path, steg_method, enc_method, enc_mode, arg_opts.password);
     }
 
     bmp_free(image);
 
 
-    return 0;
+    return retval;
 }

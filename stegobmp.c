@@ -277,6 +277,7 @@ int stegobmp_embed(bmp_image_t *image, const char *input_path, STEG_METHOD steg_
         uint8_t *data_to_steg = malloc(ciphertext_len + sizeof(uint32_t));
         memcpy(data_to_steg, &swapped_full_size, sizeof(uint32_t));
         memcpy(data_to_steg + sizeof(uint32_t), ciphertext, (size_t) ciphertext_len);
+        free(ciphertext);
 
         data_to_save = data_to_steg;
         size_of_data = ciphertext_len + sizeof(uint32_t);
@@ -369,8 +370,10 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
     uint32_t offset = 0;
 
     stegobmp_extract_size(steg_method, &hidden_data_size, image_buffer, &offset);
+//
+//    int divisor = steg_method == LSB1 ? 8 : 4;
 
-    if (hidden_data_size < bmp_get_image_size(image) / 8) {
+    if (hidden_data_size < bmp_get_image_size(image)) {
         printf("[!] Embeded file possibly found.\n");
     } else {
         return 1;
@@ -439,7 +442,7 @@ int stegobmp_extract(bmp_image_t *image, const char *output_path, STEG_METHOD st
     if (fp == NULL) {
         printf("Could not open file %s: ", output_path);
         printf("%s\n", strerror(errno));
-        return 0;
+        return 3;
     }
 
     fwrite(raw_data, hidden_data_size, 1, fp);
